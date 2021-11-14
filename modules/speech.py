@@ -1,3 +1,11 @@
+"""
+Speech Module
+
+Implements voice message recognition and transformers model for answer generation
+"""
+
+
+import logging
 import os
 import subprocess
 
@@ -35,7 +43,7 @@ class SpeechModule(BotModule):
 
         current_directory = os.path.dirname(os.path.abspath(__file__))
         wav_voice_path = current_directory + "\\voice_messages\\recognition.wav"
-        subprocess.run(['ffmpeg', '-i', voice.file_path, '-y', '-ar', '16000', wav_voice_path])
+        subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', voice.file_path, '-y', '-ar', '16000', wav_voice_path])
 
         update.message.delete()
         sent_message = update.message.reply_text("Listening...")
@@ -47,18 +55,22 @@ class SpeechModule(BotModule):
                 sent_message.edit_text(f"*You say:* _{transcription}_", parse_mode='markdown')
             except UnknownValueError:
                 sent_message.edit_text(f"Can't hear you")
+        logging.log(logging.INFO, f"""Got voice: {update.message.from_user.name} -> {transcription}""")
 
         chat_id, user_id = update.message.chat_id, update.message.from_user.id
         response = self.generate_response(transcription, user_id)
         context.bot.send_message(chat_id, f"{response}")
+        logging.log(logging.INFO, f"""Responded: BOT -> {response}""")
 
     def handle_text(self, update: Update, context: CallbackContext):
         text = update.message.text
+        logging.log(logging.INFO, f"""Got message: {update.message.from_user.name} -> {text}""")
 
         chat_id, user_id = update.message.chat_id, update.message.from_user.id
         sent_message = context.bot.send_message(chat_id, "_Typing..._", parse_mode='markdown')
         response = self.generate_response(text, user_id)
         sent_message.edit_text(f"{response}")
+        logging.log(logging.INFO, f"""Responded: BOT -> {response}""")
 
     def generate_response(self, message: str, user_id: int):
         model, tokenizer, chat_histories = self.response_model
@@ -70,11 +82,13 @@ class SpeechModule(BotModule):
                                       dim=-1)
         except KeyError:
             bot_input_ids = new_user_input_ids
-        chat_history_ids = model.generate(bot_input_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
-        if len(chat_history_ids[0]) > 700:
-            chat_history_ids = chat_history_ids[:, len(chat_history_ids[0]):]
 
-        chat_histories[user_id] = chat_history_ids
+        chat_history_ids = model.generate(bot_input_ids, max_length=40, pad_token_id=tokenizer.eos_token_id)
+
+        if len(chat_history_ids[0]) > 30:
+            chat_histories[user_id] = chat_history_ids[:, len(chat_history_ids[0]):]
+        else:
+            chat_histories[user_id] = chat_history_ids
 
         response = tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True)
         if response in self.previous_responses or response == message:
@@ -83,4 +97,5 @@ class SpeechModule(BotModule):
         if len(self.previous_responses) == 3:
             self.previous_responses.pop(0)
         self.previous_responses.append(response)
+
         return response
