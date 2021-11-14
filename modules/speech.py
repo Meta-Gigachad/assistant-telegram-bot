@@ -9,6 +9,7 @@ from telegram.ext import Dispatcher, MessageHandler, Filters, CallbackContext
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
+import gc
 
 
 class SpeechModule(BotModule):
@@ -22,11 +23,12 @@ class SpeechModule(BotModule):
         )
         self.recognizer = Recognizer()
 
-        tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-large")
-        model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-large")
+        tokenizer = AutoTokenizer.from_pretrained("HansAnonymous/DialoGPT-small-shrek")
+        model = AutoModelForCausalLM.from_pretrained("HansAnonymous/DialoGPT-small-shrek")
         chat_histories = {}
         self.previous_responses = []
         self.response_model = (model, tokenizer, chat_histories)
+        gc.collect()
 
     def handle_voice(self, update: Update, context: CallbackContext):
         voice = update.message.voice.get_file()
@@ -68,15 +70,16 @@ class SpeechModule(BotModule):
                                       dim=-1)
         except KeyError:
             bot_input_ids = new_user_input_ids
-        chat_history_ids = model.generate(bot_input_ids, max_length=150, pad_token_id=tokenizer.eos_token_id)
+        chat_history_ids = model.generate(bot_input_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
+        if len(chat_history_ids[0]) > 700:
+            chat_history_ids = chat_history_ids[:, len(chat_history_ids[0]):]
 
         chat_histories[user_id] = chat_history_ids
 
         response = tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True)
         if response in self.previous_responses or response == message:
             chat_histories[user_id] = chat_history_ids[:, len(chat_history_ids[0]):]
-            if message[:3] == "$.$":
-                response = self.generate_response("$.$" + response, user_id)
+            response = "..."
         if len(self.previous_responses) == 3:
             self.previous_responses.pop(0)
         self.previous_responses.append(response)
