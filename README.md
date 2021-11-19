@@ -11,7 +11,7 @@ Toy assistant bot, with modular structure.
 
 ## Custom Modules
 
-You can add your own modules to the bot. You should inherit it from `modules.base.BotModule` use [telegram.ext](https://python-telegram-bot.readthedocs.io/en/stable/index.html) for it. Here is a sample Module class
+You can add your own modules to the bot. To create a module you should inherit it from `modules.base.BotModule`. Use handlers from [telegram.ext](https://python-telegram-bot.readthedocs.io/en/stable/index.html). Here is a sample Module class
 ```python
 from modules.base import BotModule
 from telegram.ext import Dispatcher
