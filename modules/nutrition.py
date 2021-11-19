@@ -7,12 +7,15 @@ Classes:
     FoodHistory - dated collection of instances of FoodItem class
     NutritionFacts - contains nutrients values, has overwritten arithmetics
 """
+import logging
 import re
 
 import mysql.connector
 import telegram.ext as bot_api
 from mysql.connector.connection import MySQLConnection
 from mysql.connector.cursor import MySQLCursor
+from telegram import ReplyMarkup
+from telegram.ext import Filters
 from telegram.ext.callbackqueryhandler import CallbackQueryHandler
 from telegram.ext.conversationhandler import ConversationHandler
 from telegram.ext.messagehandler import MessageHandler
@@ -25,22 +28,23 @@ from config import SQL_DATABASE
 
 
 class NutritionModule(BotModule):
-    def __init__(self, bot_dispatcher: bot_api.Dispatcher) -> None:
+    def __init__(self, dispatcher: bot_api.Dispatcher):
         super().__init__(
-            bot_dispatcher,
-            handlers=[
+            dispatcher,
+            [
                 ConversationHandler(
-                    entry_points=[MessageHandler(bot_api.Filters.regex(r'^add food'), self._add_food_entry)],
+                    entry_points=[MessageHandler(Filters.regex(r'^add food'), self._add_food_entry)],
                     states={
-                        "SPECIFY_NAME": [MessageHandler(bot_api.Filters.text, callback=self._add_food_state_name)],
-                        "SPECIFY_GRAMS": [MessageHandler(bot_api.Filters.text, callback=self._add_food_state_grams)],
+                        "SPECIFY_NAME": [MessageHandler(Filters.text, callback=self._add_food_state_name)],
+                        "SPECIFY_GRAMS": [MessageHandler(Filters.text, callback=self._add_food_state_grams)],
                         "CHOOSE_ITEM": [CallbackQueryHandler(callback=self._add_food_state_choose_item)],
                         "SPECIFY_CALORIES": [
-                            MessageHandler(bot_api.Filters.text, callback=self._add_food_state_calories)],
-                        "SPECIFY_PFC": [MessageHandler(bot_api.Filters.text, callback=self._add_food_state_pfc)]
+                            MessageHandler(Filters.text, callback=self._add_food_state_calories)],
+                        "SPECIFY_PFC": [MessageHandler(Filters.text, callback=self._add_food_state_pfc)]
                     },
-                    fallbacks=[MessageHandler(bot_api.Filters.regex(r'^add food'), self._add_food_entry)]
-                )
+                    fallbacks=[MessageHandler(Filters.regex(r'^add food'), self._add_food_entry)]
+                ),
+                MessageHandler(Filters.regex(r'^food stats'), self._food_stats)
             ]
         )
 
@@ -51,10 +55,46 @@ class NutritionModule(BotModule):
         )
 
         self.dbcursor: MySQLCursor = self.database.cursor()
-        self.dbcursor.execute("USE nutrition_module")
         # self.food_history = FoodHistory()
 
+    def _food_stats(self, update: Update, context: bot_api.CallbackContext):
+        self.dbcursor.execute("USE nutrition_module")
+        logging.log(logging.INFO, f"{update.message.from_user.name} Requested Food Stats")
+        self.dbcursor.execute('''SELECT 
+            time(time), name, grams,
+            calories * grams / 100 AS calories,
+            protein * grams / 100 AS protein,
+            fats * grams / 100 AS fats,
+            carbohydrates * grams / 100 AS carbohydrates
+            FROM history_303245273
+            INNER JOIN food_dictionary
+            ON food_dictionary.id = history_303245273.food_id
+            WHERE date(time) = current_date();''')
+        today_records = self.dbcursor.fetchall()
+
+        self.dbcursor.execute("""SELECT
+            SUM(calories * grams / 100) AS calories,
+            SUM(protein * grams / 100) AS protein,
+            SUM(fats * grams / 100) AS fats,
+            SUM(carbohydrates * grams) / 100 AS carbohydrates
+            FROM history_303245273
+            INNER JOIN food_dictionary
+            ON food_dictionary.id = history_303245273.food_id
+            WHERE date(time) = current_date();""")
+        today_totals = self.dbcursor.fetchone()
+
+        message = "\n".join([
+            "*--TODAY STATS--*",
+            "*Eaten:*",
+            "\n".join(map(lambda x: "{}: {} {}g {}cal ({}p {}f {}c)".format(*x).zfill(2), today_records)),
+            "*Total:* {}cal\nprotein - {}g\nfats - {}g\ncarbs - {}g".format(*today_totals).zfill(2)
+        ])
+
+        update.message.reply_text(message, parse_mode="markdown")
+        logging.log(logging.INFO, f"Responded:\n{message}")
+
     def _add_food_entry(self, update: Update, context: bot_api.CallbackContext):
+        self.dbcursor.execute("USE nutrition_module")
         dbcursor = self.dbcursor
         user_id = update.message.from_user.id
         user_name = update.message.from_user.name
