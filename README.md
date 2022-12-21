@@ -1,32 +1,32 @@
-# Assistant Telegram Bot
-Toy assistant bot, with modular structure.
+# Helpful Shrek Bot
+Small bot impersonation of Shrek. Bot is deployed [here](https://t.me/MetaGigachad_DebugBot) until 01.01.2023.
 
-## Current functionality
+Uses [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) which provides **convenience wrappers** as well as **async runtime**.
 
-* **Generates responses** to all user messages exept specific commands. Uses *"HansAnonymous/DialoGPT-small-shrek"* model for that
-* **Translates user voice messages** by using *Google Speech-To-Text API* and responds to them
-* Has **Nutrition Module** which stores info about food eaten by *user* and has commands:
-  * `add food` - adds eaten food to the user food history. You can use food item that is already added to the database, or add your own
-  *  `food stats` - returns information about food eaten today
+Most data is stored in [MySQL](https://www.mysql.com/) database.
 
-## Custom Modules
+# Deploy
 
-You can add your own modules to the bot. To create a module you should inherit it from `modules.base.BotModule`. Use handlers from [telegram.ext](https://python-telegram-bot.readthedocs.io/en/stable/index.html). Here is a sample Module class
-```python
-from modules.base import BotModule
-from telegram.ext import Dispatcher
+1. Add **.env** file. You can copy the example from **.env.example** and fill in the blanks.
+2. You will need to have [docker](https://www.docker.com/) installed. Navigate to project root directory. Then just run
+    ```bash
+    docker compose --env-file .env up
+    ```
 
+# Current functionality
 
-class SampleModule(BotModule):
-    def __init__(self, dispatcher: Dispatcher):
-        super().__init__(
-            dispatcher,
-            [handler_1, handler_2]
-        )
-```
+## Swamp Nutrition
 
-Then just add your module to the bot
-```python
-my_bot = Bot(BOT_TOKEN)
-my_bot.add_modules([SampleModule, NutritionModule, TrainingModule, SpeechModule])
-```
+1. You can add food when you eat it using `/add_food`
+2. Then you can watch what you have eaten today using `/food_stats`
+
+## Swamp Training
+
+1. You can add new exercises using `/add_exercise`
+2. You can generate a training session based on your exercises using `/generate_training`
+
+## Talking with Shrek
+
+1. You can use get who you are in Shrek universe using `/who_am_i_in_shrek`
+2. You can write any message to Shrek and he will respond.
+3. If you are lazy to write you can record a voice message and Shrek will answer it too.

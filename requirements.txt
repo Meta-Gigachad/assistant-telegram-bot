@@ -1,0 +1,6 @@
+mysql-connector-python==8.0.31
+torch==1.13.0
+transformers==4.25.1
+python-telegram-bot==20.0b0
+SpeechRecognition==3.9.0
+python-dotenv==0.21.0
